@@ -64,108 +64,111 @@ control calculator(inout headers_t hdr, inout metadata_t meta,
   // - Apply the one requested in the calc header (use a table)
   // - Decide how to handle sending the result back. Should that
   //   be handled here, or fall through to standard forwarding?
-
-  apply {
-    int<32> existing_mem;
-    int<32> new_mem;
-    //handling arithmetic logics
-    //add
-    if (hdr.calcu.op == 1) {
-      hdr.calcu.a = hdr.calcu.a + hdr.calcu.b;
-    }
-    //min
-    if (hdr.calcu.op == 2) {
-      if (SIGNED(32,hdr.calcu.a) < SIGNED(32,hdr.calcu.b)) {
+  
+  // Implementing individual actions. a pivot from the poc version of sequential if conditions
+  int<32> existing_mem;
+  int<32> new_mem;
+  action add() {
+    hdr.calcu.a = hdr.calcu.a + hdr.calcu.b;
+  }
+  action min() {
+    if (SIGNED(32,hdr.calcu.a) < SIGNED(32,hdr.calcu.b)) {
       hdr.calcu.a = hdr.calcu.a;
       } else {
         hdr.calcu.a = hdr.calcu.b;
       }
-    }
-    //max
-    if (hdr.calcu.op == 3) {
-      if (SIGNED(32,hdr.calcu.a) > SIGNED(32,hdr.calcu.b)) {
+  }
+  action max() {
+    if (SIGNED(32,hdr.calcu.a) > SIGNED(32,hdr.calcu.b)) {
       hdr.calcu.a = hdr.calcu.a;
       } else {
         hdr.calcu.a = hdr.calcu.b;
       }
+  }
+  action neg() { hdr.calcu.a = -hdr.calcu.a; }
+  action shl() { hdr.calcu.a = hdr.calcu.a << 1; }
+  action shr() { hdr.calcu.a = hdr.calcu.a >> 1; }
+  action mstore() {
+    mem.read(existing_mem, 0);
+    mem.write(0, hdr.calcu.a);
+    hdr.calcu.a = existing_mem;
+  }
+  action mload () {
+    mem.read(existing_mem,0);
+    hdr.calcu.a = existing_mem;
+  }
+  action madd () {
+    mem.read(existing_mem,0);
+    new_mem = SIGNED(32, existing_mem) + hdr.calcu.a;
+    mem.write(0, new_mem);
+    hdr.calcu.a = existing_mem;
+  }
+  action mmin () {
+    mem.read(existing_mem,0);
+    if (SIGNED(32,existing_mem) < SIGNED(32,hdr.calcu.a)) {
+      new_mem = existing_mem;
+    } else {
+      new_mem = hdr.calcu.a;
     }
-    //neg
-    if (hdr.calcu.op == 4) {
-      hdr.calcu.a = -hdr.calcu.a;
+    mem.write(0, new_mem);
+    hdr.calcu.a = existing_mem;
+  }
+  action mmax () {
+    mem.read(existing_mem,0);
+    if (SIGNED(32,existing_mem) < SIGNED(32,hdr.calcu.a)) {
+      new_mem = hdr.calcu.a;
+    } else {
+      new_mem = existing_mem;
     }
-    //shl
-    if (hdr.calcu.op == 5) {
-      hdr.calcu.a = hdr.calcu.a << 1;
-    }
-    //shr
-    if (hdr.calcu.op == 6) {
-      hdr.calcu.a = hdr.calcu.a >> 1;
-    }
-    // implementing memory blocks
-    //mstore
-    if (hdr.calcu.op == 11) {
-      mem.read(existing_mem, 0);
-      mem.write(0, hdr.calcu.a);
-      hdr.calcu.a = existing_mem;
-    }
-    //mload
-    if (hdr.calcu.op == 12) {
-      mem.read(existing_mem,0);
-      hdr.calcu.a = existing_mem;
-    }
-    //madd
-    if (hdr.calcu.op == 13) {
-      mem.read(existing_mem,0);
-      new_mem = SIGNED(32, existing_mem) + hdr.calcu.a;
-      mem.write(0, new_mem);
-      hdr.calcu.a = existing_mem;
-    }
-    //mmin
-    if (hdr.calcu.op == 14) {
-      mem.read(existing_mem,0);
-      if (SIGNED(32,existing_mem) < SIGNED(32,hdr.calcu.a)) {
-        new_mem = existing_mem;
-      } else {
-        new_mem = hdr.calcu.a;
-      }
-      mem.write(0, new_mem);
-      hdr.calcu.a = existing_mem;
-    }
-    //mmax
-    if (hdr.calcu.op == 15) {
-      mem.read(existing_mem,0);
-      if (SIGNED(32,existing_mem) < SIGNED(32,hdr.calcu.a)) {
-        new_mem = hdr.calcu.a;
-      } else {
-        new_mem = existing_mem;
-      }
-      mem.write(0, new_mem);
-      hdr.calcu.a = existing_mem;
-    }
-    //mneg
-    if (hdr.calcu.op == 16) {
-      mem.read(existing_mem,0);
-      new_mem = -SIGNED(32, existing_mem);
-      mem.write(0, new_mem);
-      hdr.calcu.a = existing_mem;
-    }
-    //mshl
-    if (hdr.calcu.op == 17) {
-      mem.read(existing_mem,0);
-      new_mem = SIGNED(32,existing_mem) << 1;
-      mem.write(0,new_mem);
-      hdr.calcu.a = existing_mem;
-    }
-    //mshr
-    if (hdr.calcu.op == 18) {
+    mem.write(0, new_mem);
+    hdr.calcu.a = existing_mem;
+  }
+  action mneg () {
+    mem.read(existing_mem,0);
+    new_mem = -SIGNED(32, existing_mem);
+    mem.write(0, new_mem);
+    hdr.calcu.a = existing_mem;
+  }
+  action mshl () {
+    mem.read(existing_mem,0);
+    new_mem = SIGNED(32,existing_mem) << 1;
+    mem.write(0,new_mem);
+    hdr.calcu.a = existing_mem;
+  }
+  action mshr() {
       mem.read(existing_mem,0);
       new_mem = SIGNED(32,existing_mem) >> 1;
       mem.write(0,new_mem);
       hdr.calcu.a = existing_mem;
+  }
+
+  //table implemented as suggested in the vanilla comments
+  table calculate {
+    key = { hdr.calcu.op: exact; }
+    actions = { add; min; max; neg; shl; shr; mstore; mload; madd; mmin; mmax; mneg; mshl; mshr; NoAction; }
+    size = 48;
+    default_action = NoAction();
+    const entries = {
+      1: add();
+      2: min();
+      3: max();
+      4: neg();
+      5: shl();
+      6: shr();
+      11: mstore();
+      12: mload();
+      13: madd();
+      14: mmin();
+      15: mmax();
+      16: mneg();
+      17: mshl();
+      18: mshr();
     }
   }
-  
- 
+
+  apply {
+    calculate.apply();
+  }
 }
 
 control ingress(inout headers_t hdr, inout metadata_t meta,
