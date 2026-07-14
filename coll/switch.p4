@@ -106,9 +106,10 @@ control ingress(inout headers_t hdr, inout metadata_t meta,
 
 
 //define registers as per pseudocode with some self-assumptions
-  register<bit<32>>(1) pool_reg;
-  register<bit<32>>(1) count_reg;
+  register<bit<32>>(1024) pool_reg;
+  register<bit<32>>(1024) count_reg;
   register<bit<32>>(1) num_workers_reg;
+  register<bit<32>>(1) slot_index_reg;
 
   apply {
     if (hdr.collect.isValid()) {
@@ -117,11 +118,22 @@ control ingress(inout headers_t hdr, inout metadata_t meta,
       bit<32> pool_val;
       bit<32> count_val;
       bit<32> n;
+      bit<32> slot_index;
       
       //read the registers and store the existing values in the newly defined variables
-      pool_reg.read(pool_val, 0);
-      count_reg.read(count_val, 0);
+      pool_reg.read(pool_val, (bit<32>)hdr.collect.index);
+      count_reg.read(count_val, (bit<32>)hdr.collect.index);
       num_workers_reg.read(n, 0);
+      slot_index_reg.read(slot_index, 0);
+
+    //   if (count_val == 0) {
+    //     slot_index_reg.write(0, hdr.collect.index);
+    //     slot_index = hdr.collect.index;
+    //   }
+
+    //   if (hdr.collect.index != slot_index) {
+    //     mark_to_drop(std);
+    //   } else {
 
       bit<32> new_pool_val = (bit<32>)(SIGNED(32, pool_val) + hdr.collect.value);
       bit<32> new_count_val = count_val + 1;
@@ -134,14 +146,15 @@ control ingress(inout headers_t hdr, inout metadata_t meta,
 
         hdr.udp.checksum = 0;   // this is to bypass the checksum- stop dropping aggregated packet due to checksum issues
         
-        pool_reg.write(0, 0);
-        count_reg.write(0, 0);
+        pool_reg.write((bit<32>)hdr.collect.index, 0);
+        count_reg.write((bit<32>)hdr.collect.index, 0);
         flood_mgid.read(std.mcast_grp, 0);
       } else {
-        pool_reg.write(0, new_pool_val);
-        count_reg.write(0, new_count_val);
+        pool_reg.write((bit<32>)hdr.collect.index, new_pool_val);
+        count_reg.write((bit<32>)hdr.collect.index, new_count_val);
         mark_to_drop(std);                // not complete yet, absorb it
       }
+      
     } else {
       meta.is_collect = false;
       dmac.apply();

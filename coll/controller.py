@@ -14,9 +14,10 @@ class CollController(controller.Client):
 
     def reset(self):
         super().reset()
-        self.register_reset("ingress.num_workers_reg")
+        # self.register_reset("ingress.num_workers_reg")
         self.register_reset("ingress.count_reg")
         self.register_reset("ingress.pool_reg")
+        self.register_reset("ingress.slot_index_reg")
 
 
 if __name__ == "__main__":
