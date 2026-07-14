@@ -18,7 +18,7 @@ class MyController(controller.Client):
     
     def reset(self):
         print("Resetting....")
-        super().reset
+        super().reset()
         #extend the original reset with our arp_table appended
         self.table_reset("ingress.arp_table")
 

@@ -1,6 +1,8 @@
 #include <core.p4>
 #include <v1model.p4>
 
+const bit<16> ETH_TYPE_CALC = 0x7777;
+
 header ethernet_t {
   bit<48> dstAddr;
   bit<48> srcAddr;
@@ -15,7 +17,7 @@ header calc_t {
 
 struct headers_t {
   ethernet_t eth;
-  calc_t calc;
+  calc_t calcu;
 }
 
 struct metadata_t { }
@@ -23,6 +25,17 @@ struct metadata_t { }
 parser parse(packet_in pkt, out headers_t hdr,
              inout metadata_t meta, inout standard_metadata_t std) {
   // TODO: Implement me
+  state start {
+    pkt.extract(hdr.eth);
+    transition select(hdr.eth.etherType) {
+      ETH_TYPE_CALC: calc_parser;
+      default: accept;
+    }
+  }
+  state calc_parser {
+    pkt.extract(hdr.calcu);
+    transition accept;
+  }
 }
 
 // === IMPORTANT NOTE ===
@@ -41,10 +54,9 @@ parser parse(packet_in pkt, out headers_t hdr,
 //
 #define SIGNED(bits,var) ((int<bits>)(bit<bits>)var)
 
+register<int<32>>(1) mem;
 control calculator(inout headers_t hdr, inout metadata_t meta,
                    inout standard_metadata_t std) {
-
-  action add() { hdr.calc.a = hdr.calc.a + hdr.calc.b; }
 
   // TODO: Implement the remaining calculator block
   //
@@ -53,7 +65,107 @@ control calculator(inout headers_t hdr, inout metadata_t meta,
   // - Decide how to handle sending the result back. Should that
   //   be handled here, or fall through to standard forwarding?
 
-  apply() { }
+  apply {
+    int<32> existing_mem;
+    int<32> new_mem;
+    //handling arithmetic logics
+    //add
+    if (hdr.calcu.op == 1) {
+      hdr.calcu.a = hdr.calcu.a + hdr.calcu.b;
+    }
+    //min
+    if (hdr.calcu.op == 2) {
+      if (SIGNED(32,hdr.calcu.a) < SIGNED(32,hdr.calcu.b)) {
+      hdr.calcu.a = hdr.calcu.a;
+      } else {
+        hdr.calcu.a = hdr.calcu.b;
+      }
+    }
+    //max
+    if (hdr.calcu.op == 3) {
+      if (SIGNED(32,hdr.calcu.a) > SIGNED(32,hdr.calcu.b)) {
+      hdr.calcu.a = hdr.calcu.a;
+      } else {
+        hdr.calcu.a = hdr.calcu.b;
+      }
+    }
+    //neg
+    if (hdr.calcu.op == 4) {
+      hdr.calcu.a = -hdr.calcu.a;
+    }
+    //shl
+    if (hdr.calcu.op == 5) {
+      hdr.calcu.a = hdr.calcu.a << 1;
+    }
+    //shr
+    if (hdr.calcu.op == 6) {
+      hdr.calcu.a = hdr.calcu.a >> 1;
+    }
+    // implementing memory blocks
+    //mstore
+    if (hdr.calcu.op == 11) {
+      mem.read(existing_mem, 0);
+      mem.write(0, hdr.calcu.a);
+      hdr.calcu.a = existing_mem;
+    }
+    //mload
+    if (hdr.calcu.op == 12) {
+      mem.read(existing_mem,0);
+      hdr.calcu.a = existing_mem;
+    }
+    //madd
+    if (hdr.calcu.op == 13) {
+      mem.read(existing_mem,0);
+      new_mem = SIGNED(32, existing_mem) + hdr.calcu.a;
+      mem.write(0, new_mem);
+      hdr.calcu.a = existing_mem;
+    }
+    //mmin
+    if (hdr.calcu.op == 14) {
+      mem.read(existing_mem,0);
+      if (SIGNED(32,existing_mem) < SIGNED(32,hdr.calcu.a)) {
+        new_mem = existing_mem;
+      } else {
+        new_mem = hdr.calcu.a;
+      }
+      mem.write(0, new_mem);
+      hdr.calcu.a = existing_mem;
+    }
+    //mmax
+    if (hdr.calcu.op == 15) {
+      mem.read(existing_mem,0);
+      if (SIGNED(32,existing_mem) < SIGNED(32,hdr.calcu.a)) {
+        new_mem = hdr.calcu.a;
+      } else {
+        new_mem = existing_mem;
+      }
+      mem.write(0, new_mem);
+      hdr.calcu.a = existing_mem;
+    }
+    //mneg
+    if (hdr.calcu.op == 16) {
+      mem.read(existing_mem,0);
+      new_mem = -SIGNED(32, existing_mem);
+      mem.write(0, new_mem);
+      hdr.calcu.a = existing_mem;
+    }
+    //mshl
+    if (hdr.calcu.op == 17) {
+      mem.read(existing_mem,0);
+      new_mem = SIGNED(32,existing_mem) << 1;
+      mem.write(0,new_mem);
+      hdr.calcu.a = existing_mem;
+    }
+    //mshr
+    if (hdr.calcu.op == 18) {
+      mem.read(existing_mem,0);
+      new_mem = SIGNED(32,existing_mem) >> 1;
+      mem.write(0,new_mem);
+      hdr.calcu.a = existing_mem;
+    }
+  }
+  
+ 
 }
 
 control ingress(inout headers_t hdr, inout metadata_t meta,
@@ -66,7 +178,20 @@ control ingress(inout headers_t hdr, inout metadata_t meta,
   //   Other packets should be forwarded normally
   // - For calculator packets think how to send a result back
 
-  apply { }
+  apply { 
+    if (hdr.calcu.isValid()) {
+      calc.apply(hdr, meta, std);
+
+      //swap macs for reply to client
+      bit<48> tmp_mac = hdr.eth.dstAddr;
+      hdr.eth.dstAddr = hdr.eth.srcAddr;
+      hdr.eth.srcAddr = tmp_mac;
+
+      std.egress_spec = std.ingress_port;
+    } else {
+      mark_to_drop(std);
+    }
+  }
 }
 
 control egress(inout headers_t hdr, inout metadata_t meta,
@@ -77,7 +202,10 @@ control egress(inout headers_t hdr, inout metadata_t meta,
 
 control deparse(packet_out pkt, in headers_t hdr) {
   // TODO: Implement me
-  apply { }
+  apply { 
+    pkt.emit(hdr.eth);
+    pkt.emit(hdr.calcu);
+  }
 }
 
 control no_checksum(inout headers_t hdr, inout metadata_t meta) { apply {  } }
