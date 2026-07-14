@@ -2,8 +2,8 @@
 #include <v1model.p4>
 
 const bit<16> ETH_TYPE_IPV4 = 0x0800;
-const bit<8>  UDP_PROTOCOL  = 17;
-const bit<16> COLLECT_PORT     = 50000;
+const bit<8>  UDP_PROTOCOL = 17;
+const bit<16> COLLECT_PORT = 55555;
 
 //construct the entire UDP header -- ethernet header (14 bytes) + ip header (20 bytes) + udp header (8 bytes)
 
@@ -125,6 +125,8 @@ control ingress(inout headers_t hdr, inout metadata_t meta,
 
       bit<32> new_pool_val = (bit<32>)(SIGNED(32, pool_val) + hdr.collect.value);
       bit<32> new_count_val = count_val + 1;
+
+      log_msg("coll: idx={} val={} n={} count {}->{} pool {}->{}", {hdr.collect.index, hdr.collect.value, n, count_val, new_count_val, pool_val, new_pool_val});
 
       if (new_count_val == n) {
         // last contribution for this slot: reply to everyone, reset the slot

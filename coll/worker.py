@@ -10,15 +10,18 @@ class MyCollectives(Collectives):
     def __init__(self, rank, world):
         self.rank = rank
         self.world = world
-        self.sock = socket.socket(socket.AF_NET, socket.SOCK_DGRAM)
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.sock.bind((get_ip(), COLL_PORT))
+        self.sock.bind(("", COLL_PORT))
+        self.sock.settimeout(50)
+        print(f"MyCollectives Initialized")
 
     def AllReduce(self, input: list[int], output: list[int], op : str = "sum"):
         assert len(input), "input cannot be empty"
         assert len(input) == len(output), "input and output must have the same size"
         for index, value in enumerate(input):
+            print(f"Looping over index {index} and value {value}")
             # This one is for reference. the p4 switch accepts the collect_t header in this format. We should construct a packet in the same manner
             # header collect_t {
             #     bit<32> index;
@@ -32,6 +35,7 @@ class MyCollectives(Collectives):
             #unpack the received data byte now
             idx, result = struct.unpack(">Ii", data_byte[:8]) #the response is the same 32 bit index + 32 bit value (updated after reduce) = 8 bytes, Ii is used again to unpack the same way as packed
             output[index] = result #store the result in worker's output array vector
+            print(f"[rank {self.rank}] chunk {index} done -> {result}", flush=True)
 
         # TODO: Implement me. Ignore the op argument unless you are attempting the bonus
 
@@ -52,7 +56,8 @@ if __name__ == "__main__":
     p.add_argument("world", type=int)
     args = p.parse_args()
 
-    coll = Collectives(args.rank, args.world)
+    #replacing Collectives with MyCollectives because Collectives doesn't have init and it exists only after we've extended and initialized it here 
+    coll = MyCollectives(args.rank, args.world)
 
     # TODO: Run more tests, do not rely only on the following
 
