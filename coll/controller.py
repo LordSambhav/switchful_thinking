@@ -18,8 +18,8 @@ class CollController(controller.Client):
         super().reset()
         # self.register_reset("ingress.num_workers_reg")
         for idx in range(1024):
-            self.register_reset("ingress.count_reg", idx, 0)
-            self.register_reset("ingress.pool_reg", idx, 0)
+            self.register_reset("ingress.count_reg")
+            self.register_reset("ingress.pool_reg")
             # self.register_reset("ingress.slot_index_reg", idx, 0)
 
 
