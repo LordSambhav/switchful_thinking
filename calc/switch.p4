@@ -2,7 +2,7 @@
 #include <v1model.p4>
 
 const bit<16> ETH_TYPE_CALC = 0x7777;
-
+// This solution extends the L2 switch's DMAC implementation for non-calculator packets
 header ethernet_t {
   bit<48> dstAddr;
   bit<48> srcAddr;
@@ -170,6 +170,18 @@ control calculator(inout headers_t hdr, inout metadata_t meta,
 
 control ingress(inout headers_t hdr, inout metadata_t meta,
                 inout standard_metadata_t std) {
+  register<bit<16>>(1) flood_mgid;
+
+  action flood() { flood_mgid.read(std.mcast_grp, 0); }
+  action forward(bit<9> port) { std.egress_spec = port; }
+
+  table dmac {
+    key            = { hdr.eth.dstAddr : exact; }
+    actions        = { forward; flood; }
+    size           = 4096;
+    default_action = flood();
+  }
+  
   calculator() calc;
 
   // TODO: Implement the remaining ingress block
@@ -189,15 +201,20 @@ control ingress(inout headers_t hdr, inout metadata_t meta,
 
       std.egress_spec = std.ingress_port;
     } else {
-      mark_to_drop(std);
+      dmac.apply();
     }
   }
 }
 
 control egress(inout headers_t hdr, inout metadata_t meta,
                inout standard_metadata_t std) {
-  // TODO: Implement me
-  apply { }
+  const bit<32> PKT_INSTANCE_TYPE_REPLICATION = 5;
+  apply {
+    if (std.instance_type == PKT_INSTANCE_TYPE_REPLICATION &&
+        std.egress_port == std.ingress_port) {
+      mark_to_drop(std);
+    }
+  }
 }
 
 control deparse(packet_out pkt, in headers_t hdr) {
