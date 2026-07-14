@@ -213,8 +213,7 @@ control egress(inout headers_t hdr, inout metadata_t meta,
                inout standard_metadata_t std) {
   const bit<32> PKT_INSTANCE_TYPE_REPLICATION = 5;
   apply {
-    if (std.instance_type == PKT_INSTANCE_TYPE_REPLICATION &&
-        std.egress_port == std.ingress_port) {
+    if (std.instance_type == PKT_INSTANCE_TYPE_REPLICATION && std.egress_port == std.ingress_port) {
       mark_to_drop(std);
     }
   }
