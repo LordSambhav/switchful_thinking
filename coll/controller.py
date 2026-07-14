@@ -8,16 +8,19 @@ class CollController(controller.Client):
         n = len(hosts) #n value calculated
         #populate the register values
         self.register_write("ingress.num_workers_reg", 0, n)
-        self.register_write("ingress.count_reg", 0, 0)
-        self.register_write("ingress.pool_reg", 0, 0)
+
+        for idx in range(1024):
+            self.register_write("ingress.count_reg", idx, 0)
+            self.register_write("ingress.pool_reg", idx, 0)
         print(f"[{self.sw}] - n value (world size) set to {n}")
 
     def reset(self):
         super().reset()
         # self.register_reset("ingress.num_workers_reg")
-        self.register_reset("ingress.count_reg")
-        self.register_reset("ingress.pool_reg")
-        self.register_reset("ingress.slot_index_reg")
+        for idx in range(1024):
+            self.register_reset("ingress.count_reg", idx, 0)
+            self.register_reset("ingress.pool_reg", idx, 0)
+            # self.register_reset("ingress.slot_index_reg", idx, 0)
 
 
 if __name__ == "__main__":

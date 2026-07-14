@@ -30,16 +30,20 @@ class MyCollectives(Collectives):
             pkt = struct.pack(">Ii", index, value) #here >Ii creates 32+32 bits of index and value making it equal to the header in p4 switch
             #now we use the send method as suggested in the lab requirement to send the packet
             send(self.sock, pkt, (BROADCAST_IP, COLL_PORT))
-            while True:
-                data_byte, add = recv(self.sock, 1024)
 
-                #unpack the received data byte now
-                idx, result = struct.unpack(">Ii", data_byte[:8]) #the response is the same 32 bit index + 32 bit value (updated after reduce) = 8 bytes, Ii is used again to unpack the same way as packed
-                
-                if idx == index:
-                    output[index] = result #store the result in worker's output array vector
-                    print(f"[rank {self.rank}] chunk {index} done -> {result}", flush=True)
-                    break
+        completed_indices = set()
+        target_count = len(input)
+        while len(completed_indices) < target_count:
+            data_byte, add = recv(self.sock, 1024)
+            
+            #unpack the received data byte now
+            idx, result = struct.unpack(">Ii", data_byte[:8]) #the response is the same 32 bit index + 32 bit value (updated after reduce) = 8 bytes, Ii is used again to unpack the same way as packed
+            
+            if 0 <= idx < target_count:
+                output[idx] = result #store the result in worker's output array vector
+                completed_indices.add(idx)
+                print(f"[rank {self.rank}] chunk {idx} done -> {result}", flush=True)
+                # break
 
         # TODO: Implement me. Ignore the op argument unless you are attempting the bonus
 
