@@ -19,6 +19,13 @@ net.setIntfName(h, "s1", "eth0")
 net.setIntfMac(h, "s1", "00:00:00:00:00:01")
 net.setIntfIp(h, "s1", "10.0.0.1/24")
 
+#adding h2 to test actual normal network connectivity - assuming that more than one clients exist ---- to check the network validity
+h2 = net.addHost("h2")
+net.addLink(h2, "s1")
+net.setIntfName(h2, "s1", "eth1")
+net.setIntfMac(h2, "s1", "00:00:00:00:00:02")
+net.setIntfIp(h2, "s1", "10.0.0.2/24")
+
 net.setLogLevel("info")
 net.disableArpTables()
 net.setCompiler(outdir=log)
